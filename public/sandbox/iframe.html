@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cesium Sandbox</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    #cesiumContainer { width: 100%; height: 100%; }
+  </style>
+  <!-- Cesium CSS (served locally by vite-plugin-cesium at /cesium/) -->
+  <link rel="stylesheet" href="/cesium/Widgets/widgets.css" />
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <!-- Cesium JS (served locally by vite-plugin-cesium at /cesium/) -->
+  <script src="/cesium/Cesium.js"></script>
+  <!-- Babel standalone for TS→JS transpilation (local copy at /babel.min.js) -->
+  <script src="/babel.min.js"></script>
+
+  <script>
+    (function() {
+      'use strict';
+
+      var currentViewer = null;
+      var userStyleEl = null;
+
+      // Intercept console
+      ['log', 'warn', 'info', 'error'].forEach(function(level) {
+        var orig = console[level].bind(console);
+        console[level] = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var msg = args.map(function(a) {
+            if (typeof a === 'object') {
+              try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
+            }
+            return String(a);
+          }).join(' ');
+
+          if (level === 'error') {
+            window.parent.postMessage({ type: 'ERROR', message: msg }, '*');
+          } else {
+            window.parent.postMessage({ type: 'LOG', level: level, message: msg }, '*');
+          }
+          orig.apply(console, arguments);
+        };
+      });
+
+      // Global error handlers
+      window.addEventListener('error', function(event) {
+        window.parent.postMessage({
+          type: 'ERROR',
+          message: event.message || 'Unknown error',
+          stack: event.error ? event.error.stack : undefined
+        }, '*');
+      });
+
+      window.addEventListener('unhandledrejection', function(event) {
+        var reason = event.reason;
+        var msg = reason instanceof Error ? reason.message : String(reason);
+        var stack = reason instanceof Error ? reason.stack : undefined;
+        window.parent.postMessage({ type: 'ERROR', message: msg, stack: stack }, '*');
+      });
+
+      function cleanup() {
+        return new Promise(function(resolve) {
+          // Remove user style
+          if (userStyleEl && userStyleEl.parentNode) {
+            userStyleEl.parentNode.removeChild(userStyleEl);
+            userStyleEl = null;
+          }
+
+          // Destroy viewer
+          if (currentViewer) {
+            try {
+              if (!currentViewer.isDestroyed()) {
+                currentViewer.destroy();
+              }
+            } catch(e) {
+              // ignore
+            }
+            currentViewer = null;
+          }
+
+          // Clear container
+          var container = document.getElementById('cesiumContainer');
+          if (container) {
+            container.innerHTML = '';
+          }
+
+          // Give WebGL context 50ms to recover
+          setTimeout(resolve, 50);
+        });
+      }
+
+      function runCode(files, cesiumToken) {
+        window.parent.postMessage({ type: 'RUN_START' }, '*');
+
+        cleanup().then(function() {
+          try {
+            // Set Cesium token if provided
+            if (cesiumToken && window.Cesium) {
+              window.Cesium.Ion.defaultAccessToken = cesiumToken;
+            }
+
+            // Inject CSS
+            var cssContent = files['style.css'] || '';
+            if (cssContent) {
+              userStyleEl = document.createElement('style');
+              userStyleEl.textContent = cssContent;
+              document.head.appendChild(userStyleEl);
+            }
+
+            // Transpile and run main.ts
+            var tsCode = files['main.ts'] || '';
+            if (!tsCode) {
+              window.parent.postMessage({ type: 'ERROR', message: 'main.ts is empty' }, '*');
+              return;
+            }
+
+            // Transpile TS → JS using Babel
+            var jsCode;
+            try {
+              var result = Babel.transform(tsCode, {
+                presets: [['typescript', { allExtensions: true }]],
+                filename: 'main.ts'
+              });
+              jsCode = result.code;
+            } catch(transpileError) {
+              window.parent.postMessage({
+                type: 'ERROR',
+                message: 'Transpile error: ' + transpileError.message
+              }, '*');
+              return;
+            }
+
+            // Provide Cesium and container as globals
+            var sandboxFn = new Function(
+              'Cesium',
+              'container',
+              'viewerRef',
+              jsCode
+            );
+
+            var viewerRef = { current: null };
+            sandboxFn(window.Cesium, document.getElementById('cesiumContainer'), viewerRef);
+
+            // Track viewer for cleanup (user can set viewerRef.current)
+            if (viewerRef.current) {
+              currentViewer = viewerRef.current;
+            }
+
+            window.parent.postMessage({ type: 'RUN_SUCCESS' }, '*');
+          } catch(err) {
+            window.parent.postMessage({
+              type: 'ERROR',
+              message: err.message || String(err),
+              stack: err.stack
+            }, '*');
+          }
+        });
+      }
+
+      // Listen for messages from parent
+      window.addEventListener('message', function(event) {
+        var msg = event.data;
+        if (!msg || !msg.type) return;
+
+        if (msg.type === 'RUN_CODE') {
+          var payload = msg.payload || {};
+          runCode(payload.files || {}, payload.cesiumToken);
+        }
+      });
+
+      // Signal ready when all resources are loaded
+      window.addEventListener('load', function() {
+        window.parent.postMessage({ type: 'READY' }, '*');
+      });
+    })();
+  </script>
+</body>
+</html>
