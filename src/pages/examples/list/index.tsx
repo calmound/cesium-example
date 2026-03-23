@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { Search, CheckCircle2, Circle } from 'lucide-react'
 import { useExampleListStore } from '@/store/example'
 import { getAllExamples } from '@/examples'
 import { CATEGORIES } from '@/examples/types'
@@ -17,6 +17,12 @@ const LEVEL_LABELS: Record<string, string> = { easy: '入门', medium: '中级',
 // category id -> DOM id
 function catId(cat: string) {
   return `cat-${cat}`
+}
+
+// Check if example is pending (uses placeholder code)
+function isExamplePending(example: ReturnType<typeof getAllExamples>[number]): boolean {
+  const mainTs = example.files['main.ts'] ?? ''
+  return mainTs.includes('// 🚧 占位代码')
 }
 
 export const ListPage: React.FC = () => {
@@ -138,7 +144,7 @@ export const ListPage: React.FC = () => {
                   <div className="mb-4 flex items-center gap-3">
                     <h2 className="text-base font-semibold text-foreground">{cat}</h2>
                     <span className="text-xs text-muted-foreground">
-                      {items.filter(e => e.status !== 'pending').length}/{items.length} 已实现
+                      {items.filter(e => !isExamplePending(e)).length}/{items.length} 已实现
                     </span>
                     <div className="flex-1 border-t border-border" />
                   </div>
@@ -146,7 +152,7 @@ export const ListPage: React.FC = () => {
                   {/* Cards grid */}
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
                     {items.map((example) => {
-                      const isPending = example.status === 'pending'
+                      const isPending = isExamplePending(example)
                       return (
                       <Link key={example.id} to={`/examples/${example.id}`} className="group block no-underline">
                         <div className={cn(
@@ -157,13 +163,16 @@ export const ListPage: React.FC = () => {
                         )}>
                           <div className="relative flex h-32 items-center justify-center bg-muted text-4xl">
                             🌍
-                            {isPending && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-background/40">
-                                <span className="rounded-full bg-muted-foreground/20 px-3 py-1 text-xs text-muted-foreground">
-                                  待开发
-                                </span>
-                              </div>
-                            )}
+                            <div className={cn(
+                              'absolute top-2 right-2',
+                              isPending ? 'text-muted-foreground/50' : 'text-green-500'
+                            )}>
+                              {isPending ? (
+                                <Circle className="h-5 w-5" />
+                              ) : (
+                                <CheckCircle2 className="h-5 w-5" />
+                              )}
+                            </div>
                           </div>
                           <div className="p-4">
                             <div className="mb-1 flex items-start justify-between gap-2">
