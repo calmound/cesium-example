@@ -21,15 +21,9 @@ export const meta: ExampleMeta = {
 })
 viewerRef.current = viewer
 
-async function initTerrain() {
-  const terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-    'https://www.cesium.com/ion/stk/terrain/world',
-    { requestVertexNormals: true }
-  )
-  viewer.terrainProvider = terrainProvider
-}
-
-initTerrain()
+viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+console.log('⚠️  使用 EllipsoidTerrainProvider（无地形起伏）')
+console.log('💡 生产环境请配置 CesiumTerrainProvider 或 STK Terrain Provider')
 
 const centerLon = 116.39
 const centerLat = 39.9

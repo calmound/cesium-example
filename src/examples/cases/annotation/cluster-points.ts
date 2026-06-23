@@ -23,8 +23,8 @@ const viewer = new Cesium.Viewer(container, {
 viewerRef.current = viewer
 
 // ── 创建大量 POI 点数据 ────────────────────────────
-// 使用 Entity DataSource 进行聚合
-const dataSource = new Cesium.EntityDataSource()
+// 使用 CustomDataSource 进行聚合
+const dataSource = new Cesium.CustomDataSource('poi-clusters')
 const poiCategories = [
   { name: '餐饮', color: Cesium.Color.RED, count: 200 },
   { name: '购物', color: Cesium.Color.BLUE, count: 150 },
@@ -39,7 +39,7 @@ poiCategories.forEach((category) => {
   for (let i = 0; i < category.count; i++) {
     const lon = 116.2 + Math.random() * 0.8  // 北京范围
     const lat = 39.8 + Math.random() * 0.5
-    const entity = dataSource.entities.add({
+    dataSource.entities.add({
       position: Cesium.Cartesian3.fromDegrees(lon, lat),
       point: {
         pixelSize: 8,
@@ -102,25 +102,23 @@ dataSource.clustering.clusterEvent.addEventListener((entities: Cesium.Entity[], 
   ctx.textBaseline = 'middle'
   ctx.fillText(count.toString(), radius, radius)
 
-  cluster.billboard = {
-    image: canvas,
-    width: radius * 2,
-    height: radius * 2,
-    verticalOrigin: Cesium.VerticalOrigin.CENTER,
-    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-  }
+  cluster.billboard.show = true
+  cluster.billboard.image = canvas
+  cluster.billboard.width = radius * 2
+  cluster.billboard.height = radius * 2
+  cluster.billboard.verticalOrigin = Cesium.VerticalOrigin.CENTER
+  cluster.billboard.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
 
-  cluster.label = {
-    text: count > 999 ? '999+' : count.toString(),
-    font: \`bold \${fontSize}px sans-serif\`,
-    fillColor: Cesium.Color.WHITE,
-    outlineColor: Cesium.Color.BLACK,
-    outlineWidth: 2,
-    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-    verticalOrigin: Cesium.VerticalOrigin.CENTER,
-    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-    pixelOffset: new Cesium.Cartesian2(0, 0),
-  }
+  cluster.label.show = true
+  cluster.label.text = count > 999 ? '999+' : count.toString()
+  cluster.label.font = \`bold \${fontSize}px sans-serif\`
+  cluster.label.fillColor = Cesium.Color.WHITE
+  cluster.label.outlineColor = Cesium.Color.BLACK
+  cluster.label.outlineWidth = 2
+  cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE
+  cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER
+  cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
+  cluster.label.pixelOffset = new Cesium.Cartesian2(0, 0)
 })
 
 // ── 配置聚合参数 ──────────────────────────────────
@@ -130,50 +128,56 @@ dataSource.clustering.minimumClusterSize = 3
 console.log(\`✅ 创建 \${totalPois} 个 POI 点数据\`)
 
 // ── 加载数据源 ────────────────────────────────────
-await viewer.dataSources.add(dataSource)
+async function boot() {
+  await viewer.dataSources.add(dataSource)
 
-// ── 添加单个特殊标注（不参与聚合）─────────────────
-viewer.entities.add({
-  position: Cesium.Cartesian3.fromDegrees(116.39, 39.9),
-  billboard: {
-    image: \`<svg width="60" height="75" viewBox="0 0 60 75" xmlns="http://www.w3.org/2000/svg">
-      <path d="M30 0C13.43 0 0 13.43 0 30c0 22.5 30 45 30 45s30-22.5 30-45C60 13.43 46.57 0 30 0z" fill="#e74c3c" stroke="white" stroke-width="3"/>
-      <text x="30" y="38" text-anchor="middle" fill="white" font-size="14" font-weight="bold">北京</text>
-    </svg>\`,
-    width: 60,
-    height: 75,
-    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-  },
-  description: '北京市（不参与聚合）',
-})
-console.log('📍 添加北京标注（排除聚合）')
+  // ── 添加单个特殊标注（不参与聚合）─────────────────
+  const beijingSvg = \`<svg xmlns="http://www.w3.org/2000/svg" width="60" height="75" viewBox="0 0 60 75">
+    <path d="M30 0C13.43 0 0 13.43 0 30c0 22.5 30 45 30 45s30-22.5 30-45C60 13.43 46.57 0 30 0z" fill="#e74c3c" stroke="white" stroke-width="3"/>
+    <text x="30" y="38" text-anchor="middle" fill="white" font-size="14" font-weight="bold">北京</text>
+  </svg>\`
 
-// ── 信息面板 ─────────────────────────────────────
-const infoDiv = document.createElement('div')
-infoDiv.style.position = 'absolute'
-infoDiv.style.top = '10px'
-infoDiv.style.left = '10px'
-infoDiv.style.backgroundColor = 'rgba(0,0,0,0.7)'
-infoDiv.style.color = '#fff'
-infoDiv.style.padding = '12px 16px'
-infoDiv.style.borderRadius = '8px'
-infoDiv.style.fontSize = '13px'
-infoDiv.style.zIndex = '100'
-infoDiv.innerHTML = \`
-  <div style="font-weight:bold;margin-bottom:8px;font-size:14px">📊 POI 点聚合信息</div>
-  <div>总点数: <span id="total-count">\${totalPois}</span></div>
-  <div>聚合半径: <span id="pixel-range">60</span> px</div>
-  <div>最小聚合: <span id="min-cluster">3</span> 个</div>
-  <div style="margin-top:8px;font-size:11px;color:#aaa">缩放地图观察聚合效果</div>
-\`
-container.appendChild(infoDiv)
+  viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(116.39, 39.9),
+    billboard: {
+      image: \`data:image/svg+xml;charset=utf-8,\${encodeURIComponent(beijingSvg)}\`,
+      width: 60,
+      height: 75,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+    },
+    description: '北京市（不参与聚合）',
+  })
+  console.log('📍 添加北京标注（排除聚合）')
 
-viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(116.4, 39.9, 200000),
-  duration: 2,
-})
-console.log('💡 缩放地图可观察聚合/展开效果')
-console.log('🔢 pixelRange 控制聚合半径，minimumClusterSize 控制最小聚合数')
+  // ── 信息面板 ─────────────────────────────────────
+  const infoDiv = document.createElement('div')
+  infoDiv.style.position = 'absolute'
+  infoDiv.style.top = '10px'
+  infoDiv.style.left = '10px'
+  infoDiv.style.backgroundColor = 'rgba(0,0,0,0.7)'
+  infoDiv.style.color = '#fff'
+  infoDiv.style.padding = '12px 16px'
+  infoDiv.style.borderRadius = '8px'
+  infoDiv.style.fontSize = '13px'
+  infoDiv.style.zIndex = '100'
+  infoDiv.innerHTML = \`
+    <div style="font-weight:bold;margin-bottom:8px;font-size:14px">📊 POI 点聚合信息</div>
+    <div>总点数: <span id="total-count">\${totalPois}</span></div>
+    <div>聚合半径: <span id="pixel-range">60</span> px</div>
+    <div>最小聚合: <span id="min-cluster">3</span> 个</div>
+    <div style="margin-top:8px;font-size:11px;color:#aaa">缩放地图观察聚合效果</div>
+  \`
+  container.appendChild(infoDiv)
+
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(116.4, 39.9, 200000),
+    duration: 2,
+  })
+  console.log('💡 缩放地图可观察聚合/展开效果')
+  console.log('🔢 pixelRange 控制聚合半径，minimumClusterSize 控制最小聚合数')
+}
+
+boot().catch((error) => console.error('聚合示例初始化失败:', error))
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }
 `,

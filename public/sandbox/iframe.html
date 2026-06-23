@@ -95,6 +95,120 @@
         });
       }
 
+      function normalizePath(path) {
+        return path.replace(/\\/g, '/').replace(/^\.\//, '');
+      }
+
+      function dirname(path) {
+        var normalized = normalizePath(path);
+        var idx = normalized.lastIndexOf('/');
+        return idx === -1 ? '' : normalized.slice(0, idx);
+      }
+
+      function resolveImport(fromFile, specifier) {
+        if (!specifier.startsWith('.')) return specifier;
+
+        var baseDir = dirname(fromFile);
+        var rawParts = (baseDir ? baseDir + '/' : '') + specifier;
+        var parts = rawParts.split('/');
+        var resolved = [];
+
+        for (var i = 0; i < parts.length; i++) {
+          var part = parts[i];
+          if (!part || part === '.') continue;
+          if (part === '..') {
+            resolved.pop();
+          } else {
+            resolved.push(part);
+          }
+        }
+
+        var candidate = resolved.join('/');
+        return normalizePath(candidate);
+      }
+
+      function collectModuleFiles(files) {
+        var moduleFiles = {};
+        Object.keys(files).forEach(function(name) {
+          if (/\.(ts|tsx|js|jsx)$/.test(name)) {
+            moduleFiles[normalizePath(name)] = files[name];
+          }
+        });
+        return moduleFiles;
+      }
+
+      function buildModuleBundle(files, entryFile) {
+        var moduleFiles = collectModuleFiles(files);
+        var logicalFiles = Object.keys(moduleFiles);
+        var codeByFile = {};
+
+        logicalFiles.forEach(function(file) {
+          var result = Babel.transform(moduleFiles[file], {
+            presets: [['typescript', { allExtensions: true, isTSX: file.endsWith('.tsx') }]],
+            plugins: ['transform-modules-commonjs'],
+            filename: file,
+            sourceType: 'module'
+          });
+          codeByFile[file] = result.code;
+        });
+
+        function resolveExistingModule(fromFile, specifier) {
+          var resolved = resolveImport(fromFile, specifier);
+          var candidates = [
+            resolved,
+            resolved + '.ts',
+            resolved + '.tsx',
+            resolved + '.js',
+            resolved + '.jsx',
+            resolved + '/index.ts',
+            resolved + '/index.js',
+          ];
+
+          for (var i = 0; i < candidates.length; i++) {
+            if (Object.prototype.hasOwnProperty.call(codeByFile, candidates[i])) {
+              return candidates[i];
+            }
+          }
+          return null;
+        }
+
+        logicalFiles.forEach(function(file) {
+          codeByFile[file] = codeByFile[file].replace(
+            /require\((['"])([^'"]+)\1\)/g,
+            function(full, quote, specifier) {
+              if (!specifier.startsWith('.')) return full;
+              var target = resolveExistingModule(file, specifier);
+              if (!target) return full;
+              return '__require("' + target + '")';
+            }
+          );
+        });
+
+        var moduleTable = logicalFiles.map(function(file) {
+          return JSON.stringify(file) + ': function(module, exports, __require) {\n' + codeByFile[file] + '\n}';
+        }).join(',\n');
+
+        return [
+          '(function(){',
+          'var __modules = {',
+          moduleTable,
+          '};',
+          'var __cache = {};',
+          'function __require(id) {',
+          '  if (__cache[id]) return __cache[id].exports;',
+          '  if (!Object.prototype.hasOwnProperty.call(__modules, id)) {',
+          '    throw new Error("Module not found: " + id);',
+          '  }',
+          '  var module = { exports: {} };',
+          '  __cache[id] = module;',
+          '  __modules[id](module, module.exports, __require);',
+          '  return module.exports;',
+          '}',
+          '__require(' + JSON.stringify(entryFile) + ');',
+          '})();'
+        ].join('\n');
+      }
+
       function runCode(files, cesiumToken) {
         window.parent.postMessage({ type: 'RUN_START' }, '*');
 
@@ -113,21 +227,26 @@
               document.head.appendChild(userStyleEl);
             }
 
-            // Transpile and run main.ts
-            var tsCode = files['main.ts'] || '';
-            if (!tsCode) {
+            var entryFile = files['main.ts'] ? 'main.ts' : (files['main.js'] ? 'main.js' : '');
+            if (!entryFile) {
               window.parent.postMessage({ type: 'ERROR', message: 'main.ts is empty' }, '*');
               return;
             }
 
-            // Transpile TS → JS using Babel
-            var jsCode;
             try {
-              var result = Babel.transform(tsCode, {
-                presets: [['typescript', { allExtensions: true }]],
-                filename: 'main.ts'
-              });
-              jsCode = result.code;
+              window.Cesium = window.Cesium;
+              window.container = document.getElementById('cesiumContainer');
+              window.viewerRef = { current: null };
+
+              var bundleCode = buildModuleBundle(files, entryFile);
+              new Function(bundleCode)();
+
+              setTimeout(function() {
+                if (window.viewerRef && window.viewerRef.current) {
+                  currentViewer = window.viewerRef.current;
+                }
+                window.parent.postMessage({ type: 'RUN_SUCCESS' }, '*');
+              }, 0);
             } catch(transpileError) {
               window.parent.postMessage({
                 type: 'ERROR',
@@ -135,24 +254,6 @@
               }, '*');
               return;
             }
-
-            // Provide Cesium and container as globals
-            var sandboxFn = new Function(
-              'Cesium',
-              'container',
-              'viewerRef',
-              jsCode
-            );
-
-            var viewerRef = { current: null };
-            sandboxFn(window.Cesium, document.getElementById('cesiumContainer'), viewerRef);
-
-            // Track viewer for cleanup (user can set viewerRef.current)
-            if (viewerRef.current) {
-              currentViewer = viewerRef.current;
-            }
-
-            window.parent.postMessage({ type: 'RUN_SUCCESS' }, '*');
           } catch(err) {
             window.parent.postMessage({
               type: 'ERROR',

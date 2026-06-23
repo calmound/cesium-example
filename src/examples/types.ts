@@ -22,12 +22,10 @@ export const CATEGORIES = [
   '地形分析',
   '3D Tiles',
   '空间分析',
-  '水域特效',
   '视频融合',
   '场景与粒子',
   '材质与Shader',
   '数据可视化',
-  '雷达与卫星',
   '综合应用',
 ] as const
 

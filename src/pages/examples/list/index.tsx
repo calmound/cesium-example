@@ -25,6 +25,8 @@ function isExamplePending(example: ReturnType<typeof getAllExamples>[number]): b
   return mainTs.includes('// 🚧 占位代码')
 }
 
+const SCROLL_KEY = 'example-list-scroll'
+
 export const ListPage: React.FC = () => {
   const { searchKeyword, setSearchKeyword } = useExampleListStore()
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[1])
@@ -33,6 +35,29 @@ export const ListPage: React.FC = () => {
 
   const allExamples = getAllExamples()
   const nonAllCategories = CATEGORIES.filter((c) => c !== '全部')
+
+  // Restore scroll position on mount
+  useEffect(() => {
+    if (!searchKeyword) {
+      const savedScroll = sessionStorage.getItem(SCROLL_KEY)
+      if (savedScroll && contentRef.current) {
+        contentRef.current.scrollTop = parseInt(savedScroll, 10)
+      }
+    }
+  }, [searchKeyword])
+
+  // Save scroll position on scroll
+  useEffect(() => {
+    const content = contentRef.current
+    if (!content) return
+
+    const handleScroll = () => {
+      sessionStorage.setItem(SCROLL_KEY, String(content.scrollTop))
+    }
+
+    content.addEventListener('scroll', handleScroll)
+    return () => content.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Group examples by category, filtered by search
   const grouped = nonAllCategories
@@ -85,7 +110,7 @@ export const ListPage: React.FC = () => {
     })
 
     return () => observerRef.current?.disconnect()
-  }, [searchKeyword]) // re-observe when search changes (sections may appear/disappear)
+  }, [nonAllCategories, searchKeyword]) // re-observe when search changes (sections may appear/disappear)
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -161,8 +186,28 @@ export const ListPage: React.FC = () => {
                             ? 'border-border/50 opacity-60 group-hover:opacity-80'
                             : 'border-border group-hover:border-primary/60'
                         )}>
-                          <div className="relative flex h-32 items-center justify-center bg-muted text-4xl">
-                            🌍
+                          <div className="relative h-32 overflow-hidden bg-muted">
+                            {example.cover ? (
+                              <img
+                                src={example.cover}
+                                alt={example.title}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <img
+                                src={`/thumbnails/${example.id}.png`}
+                                alt={example.title}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  const target = e.currentTarget as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const fallback = document.createElement('div');
+                                  fallback.className = 'flex h-full items-center justify-center text-4xl';
+                                  fallback.textContent = '🌍';
+                                  target.parentElement?.appendChild(fallback);
+                                }}
+                              />
+                            )}
                             <div className={cn(
                               'absolute top-2 right-2',
                               isPending ? 'text-muted-foreground/50' : 'text-green-500'

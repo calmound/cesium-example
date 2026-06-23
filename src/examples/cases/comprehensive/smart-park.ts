@@ -8,8 +8,9 @@ export const meta: ExampleMeta = {
   tags: ['智慧园区', 'IoT', '3DTiles'],
   level: 'hard',
   files: {
-    'main.ts': `\
-// 🚧 占位代码 — 完整实现即将到来
+    'main.ts': `// 智慧园区示例
+// 演示 IoT 数据综合可视化
+
 const viewer = new Cesium.Viewer(container, {
   baseLayerPicker: false, animation: false, timeline: false,
   geocoder: false, homeButton: false, sceneModePicker: false,
@@ -23,27 +24,161 @@ const viewer = new Cesium.Viewer(container, {
 })
 viewerRef.current = viewer
 
+// ── 1. 模拟建筑物 ──────────────────────────────────────
+const buildings = [
+  { name: 'A座办公楼', lon: 114.06, lat: 22.54, height: 80 },
+  { name: 'B座研发楼', lon: 114.065, lat: 22.542, height: 60 },
+  { name: 'C座厂房', lon: 114.058, lat: 22.538, height: 40 },
+  { name: 'D座仓库', lon: 114.062, lat: 22.535, height: 25 },
+]
+
+buildings.forEach((b) => {
+  viewer.entities.add({
+    name: b.name,
+    position: Cesium.Cartesian3.fromDegrees(b.lon, b.lat, b.height / 2),
+    box: {
+      dimensions: new Cesium.Cartesian3(30, 30, b.height),
+      material: Cesium.Color.fromCssColorString('#4a90d9').withAlpha(0.8),
+      outline: true,
+      outlineColor: Cesium.Color.WHITE,
+    },
+    label: {
+      text: b.name,
+      font: 'bold 12px sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.BLACK,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -10),
+    },
+  })
+})
+
+// ── 2. 人员定位 ───────────────────────────────────────
+const personnel = [
+  { name: '张三', lon: 114.060, lat: 22.540, status: 'normal' },
+  { name: '李四', lon: 114.063, lat: 22.541, status: 'normal' },
+  { name: '王五', lon: 114.065, lat: 22.539, status: 'alert' },
+]
+
+personnel.forEach((p) => {
+  const color = p.status === 'alert' ? Cesium.Color.RED : Cesium.Color.GREEN
+
+  viewer.entities.add({
+    name: p.name,
+    position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 1),
+    point: {
+      pixelSize: 12,
+      color,
+      outlineColor: Cesium.Color.WHITE,
+      outlineWidth: 2,
+    },
+    label: {
+      text: p.name,
+      font: '11px sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.BLACK,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -14),
+    },
+  })
+})
+
+// ── 3. 告警设备 ───────────────────────────────────────
+const alerts = [
+  { name: '温感告警', lon: 114.058, lat: 22.542, type: 'fire' },
+  { name: '安防告警', lon: 114.064, lat: 22.536, type: 'security' },
+]
+
+alerts.forEach((alert) => {
+  const color = alert.type === 'fire' ? Cesium.Color.ORANGE : Cesium.Color.YELLOW
+
+  viewer.entities.add({
+    name: alert.name,
+    position: Cesium.Cartesian3.fromDegrees(alert.lon, alert.lat, 1),
+    billboard: {
+      image: createAlertIcon(color),
+      width: 30,
+      height: 30,
+    },
+  })
+})
+
+// ── 4. 环境传感器数据 ──────────────────────────────────
 viewer.entities.add({
-  position: Cesium.Cartesian3.fromDegrees(114.06, 22.54),
+  position: Cesium.Cartesian3.fromDegrees(114.061, 22.54),
   label: {
-    text: '智慧园区',
-    font: 'bold 18px sans-serif',
-    fillColor: Cesium.Color.WHITE,
+    text: '温度: 25°C | 湿度: 65% | PM2.5: 35',
+    font: '12px sans-serif',
+    fillColor: Cesium.Color.CYAN,
     outlineColor: Cesium.Color.BLACK,
-    outlineWidth: 3,
     style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-    pixelOffset: new Cesium.Cartesian2(0, -30),
+    verticalOrigin: Cesium.VerticalOrigin.TOP,
+    pixelOffset: new Cesium.Cartesian2(0, 10),
   },
 })
 
-viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(114.06, 22.54, 300),
-  duration: 1.5,
+// ── 5. 摄像头标注 ─────────────────────────────────────
+const cameras = [
+  { name: 'CAM-01', lon: 114.059, lat: 22.543 },
+  { name: 'CAM-02', lon: 114.064, lat: 22.540 },
+  { name: 'CAM-03', lon: 114.062, lat: 22.537 },
+]
+
+cameras.forEach((cam) => {
+  viewer.entities.add({
+    name: cam.name,
+    position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 1),
+    point: {
+      pixelSize: 8,
+      color: Cesium.Color.BLUE,
+    },
+    label: {
+      text: cam.name,
+      font: '10px sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.BLACK,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -10),
+    },
+  })
 })
-console.log('📌 智慧园区 — 完整实现开发中')
+
+// ── 6. 告警图标生成 ───────────────────────────────────
+function createAlertIcon(color: Cesium.Color): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = 32
+  canvas.height = 32
+  const ctx = canvas.getContext('2d')!
+
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.8)'
+  ctx.beginPath()
+  ctx.arc(16, 16, 14, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = 'white'
+  ctx.font = 'bold 18px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('!', 16, 16)
+
+  return canvas
+}
+
+viewer.camera.flyTo({
+  destination: Cesium.Cartesian3.fromDegrees(114.061, 22.54, 300),
+  duration: 2,
+  complete: () => console.log('🏢 智慧园区已加载'),
+})
+
+console.log('💡 智慧园区综合可视化示例')
+console.log('👥 绿色=正常人员, 红色=告警人员')
+console.log('📹 蓝点=摄像头位置')
+console.log('🔔 橙色=火警, 黄色=安防告警')
 `,
-    'style.css': `/* 在此添加自定义样式 */
-.cesium-widget-credits { display: none !important; }
+    'style.css': `.cesium-widget-credits { display: none !important; }
 `,
   },
   guide: {

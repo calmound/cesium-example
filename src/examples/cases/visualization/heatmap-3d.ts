@@ -43,13 +43,33 @@ function getHeatColor(value: number): Cesium.Color {
   // 归一化到 0-1
   const t = (value - 50) / 50
   if (t < 0.25) {
-    return Cesium.Color.fromCssColorString('#0000ff').lerp(Cesium.Color.fromCssColorString('#00ff00'), t * 4)
+    return Cesium.Color.lerp(
+      Cesium.Color.fromCssColorString('#0000ff'),
+      Cesium.Color.fromCssColorString('#00ff00'),
+      t * 4,
+      new Cesium.Color()
+    )
   } else if (t < 0.5) {
-    return Cesium.Color.fromCssColorString('#00ff00').lerp(Cesium.Color.fromCssColorString('#ffff00'), (t - 0.25) * 4)
+    return Cesium.Color.lerp(
+      Cesium.Color.fromCssColorString('#00ff00'),
+      Cesium.Color.fromCssColorString('#ffff00'),
+      (t - 0.25) * 4,
+      new Cesium.Color()
+    )
   } else if (t < 0.75) {
-    return Cesium.Color.fromCssColorString('#ffff00').lerp(Cesium.Color.fromCssColorString('#ff0000'), (t - 0.5) * 4)
+    return Cesium.Color.lerp(
+      Cesium.Color.fromCssColorString('#ffff00'),
+      Cesium.Color.fromCssColorString('#ff0000'),
+      (t - 0.5) * 4,
+      new Cesium.Color()
+    )
   } else {
-    return Cesium.Color.fromCssColorString('#ff0000').lerp(Cesium.Color.fromCssColorString('#8b0000'), (t - 0.75) * 4)
+    return Cesium.Color.lerp(
+      Cesium.Color.fromCssColorString('#ff0000'),
+      Cesium.Color.fromCssColorString('#8b0000'),
+      (t - 0.75) * 4,
+      new Cesium.Color()
+    )
   }
 }
 

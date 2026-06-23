@@ -2,13 +2,16 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ExampleMeta } from '@/examples/types'
 
+const getExampleFilesSignature = (files: ExampleMeta['files']) => JSON.stringify(files)
+
 interface ExampleState {
   currentExample: ExampleMeta | null
   activeFile: string
   userEdits: Record<string, Record<string, string>>
+  editBaseSignatures: Record<string, string>
   setCurrentExample: (example: ExampleMeta | null) => void
   setActiveFile: (filename: string) => void
-  updateFileContent: (exampleId: string, filename: string, content: string) => void
+  updateFileContent: (exampleId: string, filename: string, content: string, sourceSignature: string) => void
   resetFileEdits: (exampleId: string) => void
   getMergedFiles: () => Record<string, string>
 }
@@ -19,6 +22,7 @@ export const useExampleStore = create<ExampleState>()(
       currentExample: null,
       activeFile: 'main.ts',
       userEdits: {},
+      editBaseSignatures: {},
 
       setCurrentExample: (example) =>
         set({
@@ -28,7 +32,7 @@ export const useExampleStore = create<ExampleState>()(
 
       setActiveFile: (filename) => set({ activeFile: filename }),
 
-      updateFileContent: (exampleId, filename, content) =>
+      updateFileContent: (exampleId, filename, content, sourceSignature) =>
         set((state) => ({
           userEdits: {
             ...state.userEdits,
@@ -37,24 +41,38 @@ export const useExampleStore = create<ExampleState>()(
               [filename]: content,
             },
           },
+          editBaseSignatures: {
+            ...state.editBaseSignatures,
+            [exampleId]: sourceSignature,
+          },
         })),
 
       resetFileEdits: (exampleId) =>
         set((state) => {
-          const { [exampleId]: _, ...rest } = state.userEdits
-          return { userEdits: rest }
+          const rest = { ...state.userEdits }
+          const signatureRest = { ...state.editBaseSignatures }
+          delete rest[exampleId]
+          delete signatureRest[exampleId]
+          return { userEdits: rest, editBaseSignatures: signatureRest }
         }),
 
       getMergedFiles: () => {
-        const { currentExample, userEdits } = get()
+        const { currentExample, userEdits, editBaseSignatures } = get()
         if (!currentExample) return {}
+        const currentSignature = getExampleFilesSignature(currentExample.files)
+        if (editBaseSignatures[currentExample.id] !== currentSignature) {
+          return currentExample.files
+        }
         const edits = userEdits[currentExample.id] ?? {}
         return { ...currentExample.files, ...edits }
       },
     }),
     {
       name: 'cesium-example-edits',
-      partialize: (state) => ({ userEdits: state.userEdits }),
+      partialize: (state) => ({
+        userEdits: state.userEdits,
+        editBaseSignatures: state.editBaseSignatures,
+      }),
     }
   )
 )

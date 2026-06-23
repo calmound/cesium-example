@@ -31,14 +31,39 @@ const dragPosition = new Cesium.CallbackProperty(() => {
 
 let currentPosition = Cesium.Cartesian3.fromDegrees(116.39, 39.9)
 
+function createMarkerCanvas() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 40
+  canvas.height = 50
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return canvas
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.beginPath()
+  ctx.moveTo(20, 48)
+  ctx.bezierCurveTo(8, 36, 2, 26, 2, 18)
+  ctx.bezierCurveTo(2, 9.2, 9.2, 2, 20, 2)
+  ctx.bezierCurveTo(30.8, 2, 38, 9.2, 38, 18)
+  ctx.bezierCurveTo(38, 26, 32, 36, 20, 48)
+  ctx.closePath()
+  ctx.fillStyle = '#e74c3c'
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.strokeStyle = '#ffffff'
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(20, 18, 6, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+
+  return canvas
+}
+
 // ── 创建可拖拽标注 ────────────────────────────────
 const draggableMarker = viewer.entities.add({
   position: dragPosition,
   billboard: {
-    image: \`<svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
-      <path d="M20 0C8.95 0 0 8.95 0 20c0 15 20 30 20 30s20-15 20-30C40 8.95 31.05 0 20 0z" fill="#e74c3c" stroke="white" stroke-width="2"/>
-      <circle cx="20" cy="18" r="6" fill="white"/>
-    </svg>\`,
+    image: createMarkerCanvas(),
     width: 40,
     height: 50,
     verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
@@ -154,6 +179,7 @@ handler.setInputAction(() => {
     
     // 输出最终坐标
     const carto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(currentPosition)
+    if (!carto) return
     const lon = Cesium.Math.toDegrees(carto.longitude).toFixed(6)
     const lat = Cesium.Math.toDegrees(carto.latitude).toFixed(6)
     console.log(\`📍 标注拖拽至: [\${lon}, \${lat}]\`)

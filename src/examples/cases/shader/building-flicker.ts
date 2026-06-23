@@ -9,86 +9,117 @@ export const meta: ExampleMeta = {
   level: 'hard',
   files: {
     'main.ts': `// 建筑扫光 CustomShader 示例
-// 为建筑添加由下至上的扫光动画效果
+// 注意：CustomShader 需要挂在 Model / Cesium3DTileset 上，普通 Entity.box 不支持 customShader。
 
-const viewer = new Cesium.Viewer(container, {
-  baseLayerPicker: false, animation: false, timeline: false,
-  geocoder: false, homeButton: false, sceneModePicker: false,
-  navigationHelpButton: false, fullscreenButton: false,
-  baseLayer: new Cesium.ImageryLayer(
-    new Cesium.UrlTemplateImageryProvider({
-      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      credit: 'OpenStreetMap contributors',
-    })
-  ),
-})
-viewerRef.current = viewer
+async function boot() {
+  const viewer = new Cesium.Viewer(container, {
+    baseLayerPicker: false,
+    animation: false,
+    timeline: false,
+    geocoder: false,
+    homeButton: false,
+    sceneModePicker: false,
+    navigationHelpButton: false,
+    fullscreenButton: false,
+    infoBox: false,
+    selectionIndicator: false,
+  })
+  viewerRef.current = viewer
 
-// ── 1. 创建建筑群数据 ─────────────────────────────────────────
-const buildings = [
-  { name: '建筑A', lon: 116.3972, lat: 39.9073, height: 200 },
-  { name: '建筑B', lon: 116.3975, lat: 39.9076, height: 150 },
-  { name: '建筑C', lon: 116.3969, lat: 39.9070, height: 180 },
-  { name: '建筑D', lon: 116.3978, lat: 39.9068, height: 220 },
-  { name: '建筑E', lon: 116.3966, lat: 39.9075, height: 160 },
-]
+  const imageryProvider = await Cesium.createWorldImageryAsync()
+  viewer.imageryLayers.removeAll()
+  const baseLayer = viewer.imageryLayers.addImageryProvider(imageryProvider)
+  baseLayer.brightness = 0.4
+  baseLayer.contrast = 1.12
+  baseLayer.saturation = 0.3
 
-// ── 2. 添加建筑盒子 ────────────────────────────────────────────
-buildings.forEach((building) => {
-  const entity = viewer.entities.add({
-    name: building.name,
-    position: Cesium.Cartesian3.fromDegrees(building.lon, building.lat, building.height / 2),
-    box: {
-      dimensions: new Cesium.Cartesian3(30, 30, building.height),
-      material: Cesium.Color.fromCssColorString('#4a90d9'),
-      outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 1,
+  viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#030711')
+  viewer.scene.highDynamicRange = true
+  viewer.scene.postProcessStages.fxaa.enabled = true
+  viewer.scene.globe.depthTestAgainstTerrain = true
+  viewer.scene.requestRenderMode = true
+  viewer.clock.shouldAnimate = true
+
+  const tileset = await Cesium.createOsmBuildingsAsync({
+    maximumScreenSpaceError: 8,
+    dynamicScreenSpaceError: true,
+    skipLevelOfDetail: true,
+  })
+
+  tileset.style = new Cesium.Cesium3DTileStyle({
+    color: "color('rgba(18, 28, 40, 0.94)')",
+  })
+
+  const shader = new Cesium.CustomShader({
+    mode: Cesium.CustomShaderMode.MODIFY_MATERIAL,
+    uniforms: {
+      u_time: {
+        type: Cesium.UniformType.FLOAT,
+        value: 0,
+      },
+      u_scanWidth: {
+        type: Cesium.UniformType.FLOAT,
+        value: 0.16,
+      },
+      u_glowStrength: {
+        type: Cesium.UniformType.FLOAT,
+        value: 1.35,
+      },
     },
-  })
-})
+    fragmentShaderText: \`
+      void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+        vec3 positionMC = fsInput.attributes.positionMC;
+        vec3 normalEC = fsInput.attributes.normalEC;
 
-// ── 3. 扫光动画系统 ──────────────────────────────────────────
-let sweepHeight = 0
-const sweepSpeed = 50  // 每秒上升的高度
+        float heightRatio = clamp(positionMC.z / 220.0, 0.0, 1.0);
+        float sweepHead = fract(u_time * 0.22);
+        float sweepBand = fract(heightRatio - sweepHead + 1.0);
+        float sweep = smoothstep(0.0, u_scanWidth, sweepBand) * (1.0 - smoothstep(u_scanWidth, u_scanWidth * 2.1, sweepBand));
 
-function updateSweepAnimation() {
-  sweepHeight += sweepSpeed * 0.016  // 假设 60fps
-  if (sweepHeight > 300) sweepHeight = 0
+        float edge = pow(1.0 - abs(normalEC.z), 2.4);
+        float roofGlow = smoothstep(0.72, 1.0, heightRatio);
 
-  buildings.forEach((building, index) => {
-    const entity = viewer.entities.getByName(building.name) as Cesium.Entity
-    if (entity && entity.box) {
-      // 计算扫光效果
-      const buildingTop = building.height
-      const sweepZone = 30  // 扫光区域高度
-      const distance = Math.abs(sweepHeight - buildingTop)
+        vec3 baseColor = mix(vec3(0.02, 0.035, 0.06), vec3(0.04, 0.1, 0.18), heightRatio);
+        vec3 scanColor = vec3(0.0, 0.95, 1.0) * sweep * 2.2;
+        vec3 rimColor = vec3(0.18, 0.72, 1.0) * edge * 0.55;
+        vec3 topColor = vec3(0.08, 0.55, 0.95) * roofGlow * 0.35;
 
-      if (distance < sweepZone) {
-        // 在扫光区域内，增强发光
-        const intensity = 1 - (distance / sweepZone)
-        const color = Cesium.Color.fromCssColorString('#00ffff').withAlpha(intensity)
-        entity.box.material = color
-      } else {
-        // 恢复正常颜色
-        entity.box.material = Cesium.Color.fromCssColorString('#4a90d9')
+        vec3 emissive = (scanColor + rimColor + topColor) * u_glowStrength;
+
+        material.diffuse = mix(material.diffuse, baseColor + emissive * 0.08, 0.94);
+        material.emissive += emissive;
+        material.alpha = 1.0;
       }
-    }
+    \`,
   })
+
+  tileset.customShader = shader
+  viewer.scene.primitives.add(tileset)
+
+  viewer.scene.preRender.addEventListener((scene, time) => {
+    const seconds = Cesium.JulianDate.secondsDifference(time, viewer.clock.startTime)
+    shader.setUniform('u_time', seconds)
+  })
+
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(116.3975, 39.9085, 900),
+    orientation: {
+      heading: Cesium.Math.toRadians(-25),
+      pitch: Cesium.Math.toRadians(-28),
+      roll: 0,
+    },
+    duration: 2.4,
+    complete: () => console.log('🏢 建筑扫光 CustomShader 已启动'),
+  })
+
+  console.log('💡 当前示例已改为真实的 3D Tiles CustomShader')
+  console.log('🌃 扫光基于建筑模型高度比例自下而上循环播放')
 }
 
-// ── 4. 启动扫光动画 ──────────────────────────────────────────
-viewer.scene.preRender.addEventListener(() => {
-  updateSweepAnimation()
+boot().catch((error) => {
+  console.error('建筑扫光加载失败:', error)
+  console.info('提示：OSM Buildings 依赖 Cesium ion token 和外网访问。')
 })
-
-viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(116.3972, 39.9073, 500),
-  duration: 2,
-  complete: () => console.log('🏢 建筑扫光效果已启动'),
-})
-
-console.log('💡 扫光效果：由下至上循环扫描建筑')
-console.log('🎨 自定义 Shader 可实现更复杂的发光效果')
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }
 `,

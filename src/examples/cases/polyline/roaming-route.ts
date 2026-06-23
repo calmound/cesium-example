@@ -4,7 +4,7 @@ export const meta: ExampleMeta = {
   id: 'roaming-route',
   title: '漫游路线（室内/空中）',
   category: '线与路径',
-  description: '沿关键帧路径平滑漫游：室内建筑穿行、空中无人机巡航、战机绕圈轨迹，支持第一视角与跟踪视角切换。',
+  description: '沿关键帧路径平滑漫游：室内建筑穿行、空中无人机巡航、战机绕圈轨迹，同时保留 Cesium 默认地球交互。',
   tags: ['漫游', '室内', '无人机'],
   level: 'medium',
   files: {
@@ -33,11 +33,15 @@ const roamingWaypoints = [
 
 // ── 创建采样位置属性 ──────────────────────────────
 const positionProperty = new Cesium.SampledPositionProperty()
+const startTime = Cesium.JulianDate.now()
 
 roamingWaypoints.forEach(({ time, position }) => {
   const [lon, lat, alt] = position
-  const julianDate = Cesium.JulianDate.now()
-  Cesium.JulianDate.addSeconds(julianDate, time, julianDate)
+  const julianDate = Cesium.JulianDate.addSeconds(
+    startTime,
+    time,
+    new Cesium.JulianDate()
+  )
   positionProperty.addSample(julianDate, Cesium.Cartesian3.fromDegrees(lon, lat, alt))
 })
 
@@ -45,8 +49,11 @@ roamingWaypoints.forEach(({ time, position }) => {
 const orientationProperty = new Cesium.VelocityOrientationProperty(positionProperty)
 
 // ── 配置时钟 ───────────────────────────────────────
-const startTime = Cesium.JulianDate.now()
-const stopTime = Cesium.JulianDate.addSeconds(startTime, 60)
+const stopTime = Cesium.JulianDate.addSeconds(
+  startTime,
+  60,
+  new Cesium.JulianDate()
+)
 viewer.clock.startTime = startTime
 viewer.clock.stopTime = stopTime
 viewer.clock.currentTime = startTime
@@ -59,7 +66,7 @@ const roamingEntity = viewer.entities.add({
   position: positionProperty,
   orientation: orientationProperty,
   model: {
-    uri: 'https://cesium.com/public/Sandcastle/SampleData/Models/CesiumAir/Cesium_Air.glb',
+    uri: '/model/air.glb',
     scale: 1,
     minimumPixelSize: 32,
   },
@@ -114,10 +121,10 @@ roamingWaypoints.forEach((wp, i) => {
   })
 })
 
-// ── 相机跟随漫游体 ─────────────────────────────────
-viewer.trackedEntity = roamingEntity
+// ── 保留默认相机交互 ────────────────────────────────
+viewer.trackedEntity = undefined
 
-console.log('🎥 相机锁定跟随漫游视角')
+console.log('🎥 保留 Cesium 默认地球交互，可自由拖拽缩放旋转')
 
 viewer.camera.flyTo({
   destination: Cesium.Cartesian3.fromDegrees(121.48, 31.23, 5000),
@@ -128,7 +135,7 @@ viewer.camera.flyTo({
 `,
   },
   guide: {
-    features: ['关键帧路径 CatmullRom 插值', '第一视角相机绑定', '室内坐标系建立', '漫游速度与时间轴联动'],
-    points: ['室内漫游需要精确的建筑模型坐标', 'CatmullRom 插值路径更自然', '需禁用默认相机控制器'],
+    features: ['关键帧路径 CatmullRom 插值', '默认地球交互保留', '室内坐标系建立', '漫游速度与时间轴联动'],
+    points: ['室内漫游需要精确的建筑模型坐标', 'CatmullRom 插值路径更自然', '如需跟拍可再显式设置 trackedEntity'],
   },
 }

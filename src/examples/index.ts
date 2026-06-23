@@ -39,7 +39,6 @@ import { meta as rectangleCircle } from './cases/geometry/rectangle-circle'
 import { meta as wallGeometry } from './cases/geometry/wall-geometry'
 import { meta as box3D } from './cases/geometry/box-3d'
 import { meta as sphere3D } from './cases/geometry/sphere-3d'
-import { meta as militarySymbol } from './cases/geometry/military-symbol'
 
 // Vector - 矢量数据
 import { meta as geojsonLoader } from './cases/vector/geojson-loader'
@@ -72,12 +71,6 @@ import { meta as sunshineAnalysis } from './cases/analysis/sunshine-analysis'
 import { meta as bufferAnalysis } from './cases/analysis/buffer-analysis'
 import { meta as volumeCalculation } from './cases/analysis/volume-calculation'
 
-// Water - 水域特效
-import { meta as waterSurface } from './cases/water/water-surface'
-import { meta as floodSimulation } from './cases/water/flood-simulation'
-import { meta as dynamicRiver } from './cases/water/dynamic-river'
-import { meta as waterGate } from './cases/water/water-gate'
-
 // Video - 视频融合
 import { meta as videoMaterial } from './cases/video/video-material'
 import { meta as video2DProjection } from './cases/video/video-2d-projection'
@@ -85,7 +78,9 @@ import { meta as video3DProjection } from './cases/video/video-3d-projection'
 import { meta as videoEditor } from './cases/video/video-editor'
 
 // Particle - 场景与粒子
-import { meta as weatherEffects } from './cases/particle/weather-effects'
+import { meta as rainEffect } from './cases/particle/rain-effect'
+import { meta as snowEffect } from './cases/particle/snow-effect'
+import { meta as fogEffect } from './cases/particle/fog-effect'
 import { meta as skyboxScene } from './cases/particle/skybox-scene'
 import { meta as particleEffects } from './cases/particle/particle-effects'
 import { meta as pointLight } from './cases/particle/point-light'
@@ -106,18 +101,14 @@ import { meta as hexagonHeatmap } from './cases/visualization/hexagon-heatmap'
 import { meta as isocontour } from './cases/visualization/isocontour'
 import { meta as oceanCurrent } from './cases/visualization/ocean-current'
 
-// Radar - 雷达与卫星
-import { meta as radarCoverage } from './cases/radar/radar-coverage'
-import { meta as satelliteTrack } from './cases/radar/satellite-track'
-import { meta as uavTrack } from './cases/radar/uav-track'
-import { meta as coneSensor } from './cases/radar/cone-sensor'
-
 // Comprehensive - 综合应用
 import { meta as smartPark } from './cases/comprehensive/smart-park'
 import { meta as smartTraffic } from './cases/comprehensive/smart-traffic'
 import { meta as typhoonTrack } from './cases/comprehensive/typhoon-track'
 import { meta as cityRoaming } from './cases/comprehensive/city-roaming'
 import { meta as cesiumThreeIntegration } from './cases/comprehensive/cesium-three-integration'
+import { meta as droneAerial } from './cases/comprehensive/drone-aerial'
+import { meta as massiveDronePrimitive } from './cases/comprehensive/massive-drone-primitive'
 
 const registry: ExampleMeta[] = [
   // 基础操作
@@ -155,7 +146,6 @@ const registry: ExampleMeta[] = [
   wallGeometry,
   box3D,
   sphere3D,
-  militarySymbol,
   // 矢量数据
   geojsonLoader,
   kmlLoader,
@@ -183,18 +173,15 @@ const registry: ExampleMeta[] = [
   sunshineAnalysis,
   bufferAnalysis,
   volumeCalculation,
-  // 水域特效
-  waterSurface,
-  floodSimulation,
-  dynamicRiver,
-  waterGate,
   // 视频融合
   videoMaterial,
   video2DProjection,
   video3DProjection,
   videoEditor,
   // 场景与粒子
-  weatherEffects,
+  rainEffect,
+  snowEffect,
+  fogEffect,
   skyboxScene,
   particleEffects,
   pointLight,
@@ -212,17 +199,14 @@ const registry: ExampleMeta[] = [
   hexagonHeatmap,
   isocontour,
   oceanCurrent,
-  // 雷达与卫星
-  radarCoverage,
-  satelliteTrack,
-  uavTrack,
-  coneSensor,
   // 综合应用
   smartPark,
   smartTraffic,
   typhoonTrack,
   cityRoaming,
   cesiumThreeIntegration,
+  droneAerial,
+  massiveDronePrimitive,
 ]
 
 export function registerExample(example: ExampleMeta) {

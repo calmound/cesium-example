@@ -22,18 +22,24 @@ export const meta: ExampleMeta = {
 viewerRef.current = viewer
 
 async function loadTerrain() {
+  let terrainProvider: Cesium.TerrainProvider
+  let sampledHeightText = 'N/A'
+  let labelHeight = 0
+
   try {
-    const terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-      'https://www.cesium.com/ion/stk/terrain/world',
-      {
-        requestVertexNormals: true,
-        requestWaterMask: true,
-      }
+    terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+      'https://www.arcgis.com/sharing/rest/apps/1/aitfs/terrain-provider',
+      { requestVertexNormals: true }
     )
     viewer.terrainProvider = terrainProvider
+  } catch {
+    terrainProvider = new Cesium.EllipsoidTerrainProvider()
+    viewer.terrainProvider = terrainProvider
+    console.log('⚠️  地形服务加载失败，使用默认地形')
+  }
 
+  try {
     viewer.scene.globe.depthTestAgainstTerrain = true
-
     viewer.scene.globe.terrainExaggeration = 2.0
     viewer.scene.globe.terrainExaggerationRelativeHeight = 0
 
@@ -47,19 +53,27 @@ async function loadTerrain() {
       Cesium.Cartesian3.fromDegrees(116.5, 40.0),
     ]
 
-    const heights = await Cesium.sampleTerrainMostDetailed(
-      terrainProvider,
-      positions
-    )
+    if (terrainProvider.availability) {
+      const heights = await Cesium.sampleTerrainMostDetailed(
+        terrainProvider,
+        positions
+      )
+
+      sampledHeightText = heights[0].height?.toFixed(2) ?? 'N/A'
+      labelHeight = heights[0].height ?? 0
+
+      console.log('采样点高程:', heights.map(h => h.height?.toFixed(2) + 'm'))
+    } else {
+      console.log('⚠️  当前地形不支持 sampleTerrainMostDetailed，跳过高程采样')
+    }
 
     console.log('地形加载完成')
-    console.log('采样点高程:', heights.map(h => h.height?.toFixed(2) + 'm'))
 
     const label = viewer.entities.add({
-      position: positions[0],
+      position: Cesium.Cartesian3.fromDegrees(116.39, 39.9, labelHeight + 50),
       label: {
         text: new Cesium.ConstantProperty(
-          \`高程: \${heights[0].height?.toFixed(2) || 'N/A'}m\`
+          \`高程: \${sampledHeightText}m\`
         ),
         font: 'bold 16px sans-serif',
         fillColor: Cesium.Color.WHITE,

@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import type * as Monaco from 'monaco-editor'
 
 let logIdCounter = 0
+const cesiumToken = __CESIUM_TOKEN__
+const getFilesSignature = (files: Record<string, string>) => JSON.stringify(files)
 
 export const DetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -48,7 +50,7 @@ export const DetailPage: React.FC = () => {
 
   const handleRun = useCallback(() => {
     const files = getMergedFiles()
-    previewRef.current?.run(files)
+    previewRef.current?.run(files, cesiumToken || undefined)
   }, [getMergedFiles])
 
   // Auto-run when example loads
@@ -61,7 +63,7 @@ export const DetailPage: React.FC = () => {
   const handleCodeChange = useCallback(
     (value: string) => {
       if (!currentExample) return
-      updateFileContent(currentExample.id, activeFile, value)
+      updateFileContent(currentExample.id, activeFile, value, getFilesSignature(currentExample.files))
 
       if (autoRun) {
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)

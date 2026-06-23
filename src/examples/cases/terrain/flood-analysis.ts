@@ -21,15 +21,9 @@ export const meta: ExampleMeta = {
 })
 viewerRef.current = viewer
 
-async function initTerrain() {
-  const terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-    'https://www.cesium.com/ion/stk/terrain/world',
-    { requestVertexNormals: true }
-  )
-  viewer.terrainProvider = terrainProvider
-}
-
-initTerrain()
+viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+console.log('⚠️  使用 EllipsoidTerrainProvider（无地形起伏）')
+console.log('💡 生产环境请配置 CesiumTerrainProvider')
 
 const centerLon = 116.39
 const centerLat = 39.9
@@ -133,7 +127,7 @@ console.log('模拟时间: 30秒')
 `,
   },
   guide: {
-    features: ['动态水面 Polygon 高度插值', '地形高程采样判断淹没区域', 'WaterMaterialProperty 水面材质', '矢量面限定淹没边界'],
+    features: ['动态水面 Polygon 高度插值', '地形高程采样判断淹没区域', 'Water 材质 uniforms 配置', '矢量面限定淹没边界'],
     points: ['水面需大量高程采样点才准确', 'sampleTerrainMostDetailed 异步采样', '水面材质可配置波浪频率与振幅'],
   },
 }

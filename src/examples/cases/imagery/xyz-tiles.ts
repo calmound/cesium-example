@@ -48,34 +48,79 @@ const viewer = new Cesium.Viewer(container, {
 })
 viewerRef.current = viewer
 
-// ── 底图切换演示 ────────────────────────────
-const names = ['osm', 'amap', 'toner', 'watercolor']
-let current = 0
+// ── 手动切换面板 ─────────────────────────────
+const controlPanel = document.createElement('div')
+controlPanel.style.cssText = [
+  'position:absolute',
+  'top:12px',
+  'left:12px',
+  'z-index:10',
+  'display:flex',
+  'flex-wrap:wrap',
+  'gap:8px',
+  'padding:10px',
+  'border-radius:12px',
+  'background:rgba(15, 23, 42, 0.82)',
+  'backdrop-filter:blur(10px)',
+  'box-shadow:0 12px 32px rgba(15, 23, 42, 0.28)',
+'].join(';')
+
+const panelTitle = document.createElement('div')
+panelTitle.textContent = 'XYZ / TMS 底图切换'
+panelTitle.style.cssText = 'width:100%;color:#e2e8f0;font-size:12px;font-weight:600;letter-spacing:0.04em;'
+controlPanel.appendChild(panelTitle)
 
 function switchBasemap(name) {
   viewer.imageryLayers.removeAll()
   viewer.imageryLayers.addImageryProvider(basemaps[name])
-  console.log(\`🗺️  切换底图: \${name}\`)
+  console.log(\`🗺️  已切换到底图: \${name}\`)
 }
 
-// 每 3 秒自动切换底图
-const timer = setInterval(() => {
-  current = (current + 1) % names.length
-  switchBasemap(names[current])
-}, 3000)
-
-// ── 叠加图层示例：在 OSM 上叠加半透明瓦片 ─────
-// 先保留 OSM，再叠加一层
-setTimeout(() => {
-  clearInterval(timer)
+function switchOverlay() {
   viewer.imageryLayers.removeAll()
   viewer.imageryLayers.addImageryProvider(basemaps.osm)
-
-  // 叠加 Toner 样式（半透明）
   const overlay = viewer.imageryLayers.addImageryProvider(basemaps.toner)
   overlay.alpha = 0.4
-  console.log('🎨 OSM + Toner 叠加显示（Toner 透明度 0.4）')
-}, 14000)
+  console.log('🎨 已切换到 OSM + Toner 叠加显示（Toner 透明度 0.4）')
+}
+
+function createSwitchButton(label, onClick, active = false) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.textContent = label
+  button.style.cssText = [
+    'border:1px solid rgba(148, 163, 184, 0.35)',
+    'border-radius:999px',
+    'padding:6px 12px',
+    'font-size:12px',
+    'line-height:1',
+    'cursor:pointer',
+    'color:#e2e8f0',
+    'background:rgba(30, 41, 59, 0.9)',
+    'transition:all 0.2s ease',
+  ].join(';')
+  if (active) {
+    button.style.background = 'rgba(59, 130, 246, 0.92)'
+    button.style.borderColor = 'rgba(96, 165, 250, 0.95)'
+  }
+  button.addEventListener('mouseenter', () => {
+    button.style.transform = 'translateY(-1px)'
+    button.style.borderColor = 'rgba(96, 165, 250, 0.9)'
+  })
+  button.addEventListener('mouseleave', () => {
+    button.style.transform = 'translateY(0)'
+    button.style.borderColor = active ? 'rgba(96, 165, 250, 0.95)' : 'rgba(148, 163, 184, 0.35)'
+  })
+  button.addEventListener('click', onClick)
+  return button
+}
+
+controlPanel.appendChild(createSwitchButton('OSM', () => switchBasemap('osm'), true))
+controlPanel.appendChild(createSwitchButton('高德', () => switchBasemap('amap')))
+controlPanel.appendChild(createSwitchButton('Toner', () => switchBasemap('toner')))
+controlPanel.appendChild(createSwitchButton('Watercolor', () => switchBasemap('watercolor')))
+controlPanel.appendChild(createSwitchButton('OSM + Toner', switchOverlay))
+container.appendChild(controlPanel)
 
 viewer.camera.flyTo({
   destination: Cesium.Cartesian3.fromDegrees(116.39, 39.9, 2000000),
@@ -83,7 +128,7 @@ viewer.camera.flyTo({
 })
 
 console.log('📦 加载 4 种 XYZ 瓦片服务：OSM / 高德 / Toner / Watercolor')
-console.log('🔄 每 3 秒自动切换底图...')
+console.log('🧭 使用左上角按钮手动切换底图或叠加显示')
 console.log('💡 subdomains 参数可分散请求到多个 CDN 节点')
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }

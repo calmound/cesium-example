@@ -21,37 +21,21 @@ export const meta: ExampleMeta = {
 })
 viewerRef.current = viewer
 
-async function initTerrain() {
-  const terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-    'https://www.cesium.com/ion/stk/terrain/world',
-    { requestVertexNormals: true }
-  )
-  viewer.terrainProvider = terrainProvider
+viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+console.log('⚠️  使用 EllipsoidTerrainProvider（无地形起伏）')
 
-  viewer.scene.globe.material = new Cesium.Material({
-    fabric: {
-      type: 'ElevationContour',
-      uniforms: {
-        spacing: 100.0,
-        width: 2.0,
-        level: 1,
-        color: Cesium.Color.YELLOW,
-        glowWidth: 10.0,
-        glowColor: Cesium.Color.ORANGE,
-      },
+viewer.scene.globe.material = new Cesium.Material({
+  fabric: {
+    type: 'ElevationContour',
+    uniforms: {
+      spacing: 100,
+      width: 2.0,
+      level: 1,
+      color: Cesium.Color.YELLOW,
+      glowWidth: 0.5,
     },
-  })
-
-  viewer.scene.globe.material = new Cesium.ElevationContourMaterial({
-    spacing: 100,
-    width: 2.0,
-    color: Cesium.Color.YELLOW,
-    glowColor: Cesium.Color.ORANGE,
-    glowWidth: 0.5,
-  })
-}
-
-initTerrain()
+  },
+})
 
 viewer.camera.flyTo({
   destination: Cesium.Cartesian3.fromDegrees(116.39, 39.9, 80000),

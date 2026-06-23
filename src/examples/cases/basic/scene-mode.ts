@@ -11,7 +11,7 @@ export const meta: ExampleMeta = {
     'main.ts': `// 二三维切换示例
 const viewer = new Cesium.Viewer(container, {
   baseLayerPicker: false, animation: false, timeline: false,
-  geocoder: false, homeButton: false, sceneModePicker: false,
+  geocoder: false, homeButton: false, sceneModePicker: true,
   navigationHelpButton: false, fullscreenButton: false,
   baseLayer: new Cesium.ImageryLayer(
     new Cesium.UrlTemplateImageryProvider({
@@ -57,31 +57,31 @@ viewer.camera.flyTo({
   destination: Cesium.Cartesian3.fromDegrees(110, 35, 5000000),
   duration: 2,
   complete: () => {
-    console.log('✅ 当前模式: 3D 球体 (SceneMode.SCENE3D)')
+    console.log('✅ 已进入 3D 球体视图')
 
     // 2秒后切换到哥伦布视图（2.5D 展开地球）
     setTimeout(() => {
       viewer.scene.morphToColumbusView(2)
-      console.log('🗺️  切换到哥伦布视图 (COLUMBUS_VIEW) - 地球展开为平面')
+      console.log('🗺️ 已切换到哥伦布视图（2.5D）')
     }, 2500)
 
     // 6秒后切换到 2D 地图
     setTimeout(() => {
       viewer.scene.morphTo2D(2)
-      console.log('📄 切换到 2D 地图 (SCENE2D) - 完全平面，禁用倾斜')
+      console.log('📄 已切换到 2D 平面地图')
     }, 6000)
 
     // 10秒后回到 3D
     setTimeout(() => {
       viewer.scene.morphTo3D(2)
-      console.log('🌍 回到 3D 球体 (SCENE3D)')
+      console.log('🌍 已回到 3D 球体视图')
     }, 10000)
   },
 })
 
-console.log('🔄 场景模式切换演示（自动播放）：')
-console.log('  3D → 哥伦布视图 → 2D → 3D')
-console.log('  当前场景模式:', viewer.scene.mode)
+console.log('🎛️ 右上角已显示场景模式按钮')
+console.log('🖱️ 可手动切换 3D、哥伦布视图（2.5D）和 2D')
+console.log('🔄 页面会自动演示一轮模式切换，便于对比差异')
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }
 `,

@@ -36,11 +36,15 @@ const flightWaypoints = [
 
 // ── 创建采样位置属性 ──────────────────────────────
 const positionProperty = new Cesium.SampledPositionProperty()
+const startTime = Cesium.JulianDate.now()
 
 flightWaypoints.forEach(({ time, position }) => {
   const [lon, lat, alt] = position
-  const julianDate = Cesium.JulianDate.now()
-  Cesium.JulianDate.addSeconds(julianDate, time, julianDate)
+  const julianDate = Cesium.JulianDate.addSeconds(
+    startTime,
+    time,
+    new Cesium.JulianDate()
+  )
   positionProperty.addSample(julianDate, Cesium.Cartesian3.fromDegrees(lon, lat, alt))
 })
 
@@ -48,8 +52,11 @@ flightWaypoints.forEach(({ time, position }) => {
 const orientationProperty = new Cesium.VelocityOrientationProperty(positionProperty)
 
 // ── 配置时钟 ───────────────────────────────────────
-const startTime = Cesium.JulianDate.now()
-const stopTime = Cesium.JulianDate.addSeconds(startTime, 100)
+const stopTime = Cesium.JulianDate.addSeconds(
+  startTime,
+  100,
+  new Cesium.JulianDate()
+)
 viewer.clock.startTime = startTime
 viewer.clock.stopTime = stopTime
 viewer.clock.currentTime = startTime
@@ -62,9 +69,10 @@ const airplaneEntity = viewer.entities.add({
   position: positionProperty,
   orientation: orientationProperty,
   model: {
-    uri: 'https://cesium.com/public/Sandcastle/SampleData/Models/CesiumAir/Cesium_Air.glb',
-    scale: 2,
-    minimumPixelSize: 32,
+    uri: '/model/air.glb',
+    scale: 80,
+    minimumPixelSize: 64,
+    maximumScale: 20000,
   },
   path: {
     resolution: 1,
@@ -120,21 +128,16 @@ flightWaypoints.forEach((wp, i) => {
   })
 })
 
-// ── 相机跟随飞机 ─────────────────────────────────
-viewer.trackedEntity = airplaneEntity
+// ── 调整到合适视角，保留 Cesium 默认交互 ─────────────
+viewer.zoomTo(viewer.entities)
 
-console.log('🎥 相机锁定跟随飞机视角')
-
-viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(118, 38.5, 200000),
-  duration: 2,
-})
+console.log('🎥 保持默认地球交互，可自由旋转缩放查看飞行路径')
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }
 `,
   },
   guide: {
-    features: ['SampledPositionProperty 路径插值', 'VelocityOrientationProperty 速度朝向', 'viewer.trackedEntity 相机跟随', 'PathGraphics 轨迹尾线'],
-    points: ['LAGRANGE 插值比 LINEAR 更平滑', 'trackedEntity 锁定相机视角', 'PathGraphics.trailTime 控制尾线长度'],
+    features: ['SampledPositionProperty 路径插值', 'VelocityOrientationProperty 速度朝向', 'viewer.zoomTo 初始定位', 'PathGraphics 轨迹尾线'],
+    points: ['LAGRANGE 插值比 LINEAR 更平滑', '默认地球交互更适合自由观察路径', 'PathGraphics.trailTime 控制尾线长度'],
   },
 }

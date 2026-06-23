@@ -48,10 +48,14 @@ const viewer = new Cesium.Viewer(container, {
 })
 viewerRef.current = viewer
 
-const dataSource = await Cesium.CzmlDataSource.load(czml)
-viewer.dataSources.add(dataSource)
+async function boot() {
+  const dataSource = await Cesium.CzmlDataSource.load(czml)
+  await viewer.dataSources.add(dataSource)
+  await viewer.zoomTo(dataSource)
+  console.log('CZML Animation loaded')
+}
 
-console.log('CZML Animation loaded')
+boot().catch((error) => console.error('CZML Animation failed:', error))
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }
 `,

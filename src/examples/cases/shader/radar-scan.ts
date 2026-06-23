@@ -4,12 +4,12 @@ export const meta: ExampleMeta = {
   id: 'radar-scan',
   title: '雷达扫描材质',
   category: '材质与Shader',
-  description: '实现旋转雷达扫描波效果：扇形渐变色、旋转动画、信号扩散圆环，可附着在地图上任意位置。',
-  tags: ['雷达', '材质', '动态'],
+  description: '使用扇形扫描区、旋转扫线和扩散圆环组合出可见的雷达效果，演示 CallbackProperty 驱动的动态扫描面。',
+  tags: ['雷达', '扫描', '动态'],
   level: 'medium',
   files: {
     'main.ts': `// 雷达扫描材质示例
-// 实现旋转雷达扫描波效果
+// 使用扇形扫描区 + 扫描线 + 扩散圆环组合出可见雷达效果
 
 const viewer = new Cesium.Viewer(container, {
   baseLayerPicker: false, animation: false, timeline: false,
@@ -24,111 +24,163 @@ const viewer = new Cesium.Viewer(container, {
 })
 viewerRef.current = viewer
 
-// ── 1. 创建雷达基地点 ─────────────────────────────────────────
-const radarPosition = Cesium.Cartesian3.fromDegrees(116.3972, 39.9073, 0)
+viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#07111f')
+viewer.scene.skyAtmosphere.hueShift = -0.18
+viewer.scene.skyAtmosphere.saturationShift = -0.35
+viewer.scene.skyAtmosphere.brightnessShift = -0.2
+viewer.scene.fog.enabled = false
 
-// ── 2. 雷达扫描动画 ──────────────────────────────────────────
-let scanAngle = 0
-const scanSpeed = 0.02  // 旋转速度
+const radarCenter = Cesium.Cartesian3.fromDegrees(116.3972, 39.9073, 18)
+const radarFrame = Cesium.Transforms.eastNorthUpToFixedFrame(radarCenter)
+const radarRange = 1200
+const sweepWidth = Cesium.Math.toRadians(34)
+const sweepSegments = 40
 
-function createRadarScanMaterial() {
-  return new Cesium.ColorMaterialProperty(
-    new Cesium.CallbackProperty(() => {
-      scanAngle += scanSpeed
-      if (scanAngle > Math.PI * 2) scanAngle -= Math.PI * 2
+const radarState = {
+  angle: Cesium.Math.toRadians(-50),
+  pulse: 0,
+}
 
-      // 创建渐变透明度的扇形效果
-      const alpha = 0.8
-      return Cesium.Color.fromCssColorString('#00ff00').withAlpha(alpha)
-    }, false)
+function localToWorld(x, y, z = 0) {
+  return Cesium.Matrix4.multiplyByPoint(
+    radarFrame,
+    Cesium.Cartesian3.fromElements(x, y, z),
+    new Cesium.Cartesian3()
   )
 }
 
-// ── 3. 添加雷达扫描椭圆 ──────────────────────────────────────
-const radarEntity = viewer.entities.add({
-  position: radarPosition,
-  ellipse: {
-    semiMajorAxis: 500,
-    semiMinorAxis: 500,
-    material: createRadarScanMaterial(),
-    height: 1,
-    outline: true,
-    outlineColor: Cesium.Color.GREEN,
-    outlineWidth: 2,
-  },
-})
+function buildSweepPositions() {
+  const positions = [radarCenter]
+  const startAngle = radarState.angle - sweepWidth * 0.5
 
-// ── 4. 添加扩散圆环 ──────────────────────────────────────────
-let ringRadius = 0
-setInterval(() => {
-  ringRadius = 0
-}, 2000)
+  for (let i = 0; i <= sweepSegments; i++) {
+    const theta = startAngle + (sweepWidth * i) / sweepSegments
+    const x = Math.cos(theta) * radarRange
+    const y = Math.sin(theta) * radarRange
+    positions.push(localToWorld(x, y))
+  }
 
-setInterval(() => {
-  ringRadius += 5
-  if (ringRadius > 500) ringRadius = 0
-}, 50)
+  return new Cesium.PolygonHierarchy(positions)
+}
 
-// 添加扩散圆环
-const ringEntity = viewer.entities.add({
-  position: radarPosition,
-  ellipse: {
-    semiMajorAxis: new Cesium.CallbackProperty(() => ringRadius, false),
-    semiMinorAxis: new Cesium.CallbackProperty(() => ringRadius, false),
-    material: Cesium.Color.GREEN.withAlpha(0.3),
-    height: 2,
-  },
-})
-
-// ── 5. 添加雷达中心点 ─────────────────────────────────────────
 viewer.entities.add({
-  position: radarPosition,
-  point: {
-    pixelSize: 10,
-    color: Cesium.Color.RED,
-    outlineColor: Cesium.Color.WHITE,
+  position: radarCenter,
+  ellipse: {
+    semiMajorAxis: radarRange,
+    semiMinorAxis: radarRange,
+    height: 18,
+    material: Cesium.Color.fromCssColorString('#00ff88').withAlpha(0.05),
+    outline: true,
+    outlineColor: Cesium.Color.fromCssColorString('#66ffcc').withAlpha(0.58),
     outlineWidth: 2,
   },
 })
 
-// ── 6. 添加扫描线 ─────────────────────────────────────────────
-const scanLineEntity = viewer.entities.add({
-  position: radarPosition,
+viewer.entities.add({
+  polygon: {
+    hierarchy: new Cesium.CallbackProperty(buildSweepPositions, false),
+    material: new Cesium.ColorMaterialProperty(
+      Cesium.Color.fromCssColorString('#00ff88').withAlpha(0.18)
+    ),
+    perPositionHeight: true,
+    outline: false,
+  },
+})
+
+viewer.entities.add({
+  position: radarCenter,
   polyline: {
     positions: new Cesium.CallbackProperty(() => {
-      const positions = []
-      for (let i = 0; i <= 100; i++) {
-        const angle = scanAngle
-        const r = (i / 100) * 500
-        const x = r * Math.cos(angle)
-        const y = r * Math.sin(angle)
-        const cartesian = Cesium.Cartesian3.fromDegrees(
-          116.3972 + (x / 111000) * 0.01,
-          39.9073 + (y / 111000) * 0.01
-        )
-        positions.push(cartesian)
-      }
-      return positions
+      const head = localToWorld(
+        Math.cos(radarState.angle) * radarRange,
+        Math.sin(radarState.angle) * radarRange
+      )
+      return [radarCenter, head]
     }, false),
-    width: 2,
-    material: Cesium.Color.GREEN,
+    width: 3,
+    material: new Cesium.PolylineGlowMaterialProperty({
+      glowPower: 0.22,
+      color: Cesium.Color.fromCssColorString('#66ffcc').withAlpha(0.95),
+    }),
   },
+})
+
+viewer.entities.add({
+  position: radarCenter,
+  ellipse: {
+    semiMajorAxis: new Cesium.CallbackProperty(
+      () => 220 + radarState.pulse * (radarRange - 220),
+      false
+    ),
+    semiMinorAxis: new Cesium.CallbackProperty(
+      () => 220 + radarState.pulse * (radarRange - 220),
+      false
+    ),
+    material: new Cesium.ColorMaterialProperty(
+      new Cesium.CallbackProperty(() => {
+        const alpha = 0.22 * (1.0 - radarState.pulse)
+        return Cesium.Color.fromCssColorString('#66ffcc').withAlpha(alpha)
+      }, false)
+    ),
+    height: 19,
+    outline: true,
+    outlineColor: Cesium.Color.fromCssColorString('#66ffcc').withAlpha(0.52),
+    outlineWidth: 1,
+  },
+})
+
+viewer.entities.add({
+  position: radarCenter,
+  point: {
+    pixelSize: 12,
+    color: Cesium.Color.fromCssColorString('#f8fafc'),
+    outlineColor: Cesium.Color.fromCssColorString('#00ff88'),
+    outlineWidth: 3,
+    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+  },
+  label: {
+    text: '雷达中心\\n扫描半径 1.2km',
+    font: '600 13px sans-serif',
+    fillColor: Cesium.Color.WHITE,
+    outlineColor: Cesium.Color.BLACK.withAlpha(0.82),
+    outlineWidth: 3,
+    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+    pixelOffset: new Cesium.Cartesian2(0, -24),
+    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+  },
+})
+
+viewer.scene.preUpdate.addEventListener(() => {
+  radarState.angle += Cesium.Math.toRadians(1.65)
+  if (radarState.angle > Cesium.Math.TWO_PI) {
+    radarState.angle -= Cesium.Math.TWO_PI
+  }
+
+  radarState.pulse += 0.015
+  if (radarState.pulse > 1) {
+    radarState.pulse = 0
+  }
 })
 
 viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(116.3972, 39.9073, 2000),
+  destination: Cesium.Cartesian3.fromDegrees(116.3972, 39.9073, 2600),
+  orientation: {
+    heading: Cesium.Math.toRadians(8),
+    pitch: Cesium.Math.toRadians(-42),
+    roll: 0,
+  },
   duration: 2,
   complete: () => console.log('📡 雷达扫描已启动'),
 })
 
-console.log('💡 雷达扫描：绿色扇形 + 扩散圆环 + 扫描线')
-console.log('🎯 可调整 semiMajorAxis 修改探测范围')
+console.log('💡 雷达扫描：扇形扫描区 + 扫描线 + 扩散圆环')
+console.log('🎯 可调整 radarRange 和 sweepWidth 改变探测范围与扇面宽度')
 `,
     'style.css': `.cesium-widget-credits { display: none !important; }
 `,
   },
   guide: {
-    features: ['CircleWaveMaterial 波纹材质', 'CallbackProperty 驱动旋转角度', 'EllipseMaterialProperty 扇形着色', 'requestAnimationFrame 动画循环'],
-    points: ['材质颜色用 Color.fromCssColorString 解析', 'atan2 计算片元角度实现扇形', 'alpha 透明度渐变增强真实感'],
+    features: ['扇形 PolygonHierarchy 扫描区', 'CallbackProperty 驱动扫掠角度', '扩散圆环半径循环变化', '扫描线突出方向感'],
+    points: ['用局部 ENU 坐标生成扇形边界更稳定', '动态半径和透明度一起变化会更像真实雷达', '扇区 + 扫描线 + 外圈组合比单独整圆更容易读懂'],
   },
 }

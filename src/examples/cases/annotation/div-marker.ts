@@ -138,13 +138,17 @@ function updateDivMarkers() {
     const position = Cesium.Cartesian3.fromDegrees(data.lon, data.lat)
     
     // 遮挡检测：点在球背面时隐藏
-    const carto = Cesium.Ellipsoid.cartesianToCartographic(position)
-    const normal = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(cartographic)
+    const carto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position)
+    if (!carto) {
+      wrapper.style.display = 'none'
+      return
+    }
+    const normal = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormalCartographic(carto)
     const toCamera = Cesium.Cartesian3.subtract(camera.position, position, new Cesium.Cartesian3())
     const dot = Cesium.Cartesian3.dot(normal, Cesium.Cartesian3.normalize(toCamera, new Cesium.Cartesian3()))
     
     // 世界坐标 → 屏幕坐标
-    const screenPos = Cesium.SceneTransforms.wgs84ToWindowCoordinates(scene, position)
+    const screenPos = scene.cartesianToCanvasCoordinates(position)
     
     if (screenPos && dot > 0) {
       wrapper.style.display = 'block'
