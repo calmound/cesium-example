@@ -70,6 +70,13 @@ let lastFrameTime = performance.now()
 let currentModeIndex = 0
 let isAnimating = false
 let animationTime = 0
+let lastUpdateMs = 0
+const UPDATE_INTERVAL = 50
+
+const LON_DEG_FACTOR = 1 / (111320 * Math.cos(Cesium.Math.toRadians(39.9073)))
+const LAT_DEG_FACTOR = 1 / 110540
+const _scratchCart3 = new Cesium.Cartesian3()
+const _scratchHPR = new Cesium.HeadingPitchRoll()
 
 function metersToLongitudeDegrees(meters, latitude) {
   return meters / (111320 * Math.cos(Cesium.Math.toRadians(latitude)))
@@ -151,7 +158,6 @@ function switchMode(modeIndex: number) {
 
 function toggleAnimation() {
   isAnimating = !isAnimating
-  flightController.isAnimating = isAnimating
   const btn = document.getElementById('toggle-animation')
   if (btn) btn.textContent = isAnimating ? '⏸ 暂停动画' : '▶ 开始动画'
   if (isAnimating) viewer.scene.requestRender()
@@ -335,8 +341,8 @@ function calculateDronePosition(droneId: number, row: number, col: number, time:
   }
 
   return {
-    lon: center.lon + metersToLongitudeDegrees(finalX, centerLat),
-    lat: centerLat + metersToLatitudeDegrees(finalY),
+    lon: center.lon + finalX * LON_DEG_FACTOR,
+    lat: centerLat + finalY * LAT_DEG_FACTOR,
     altitude: Math.max(50, altitude),
     heading: heading,
   }
@@ -386,29 +392,31 @@ async function addMassiveModelPrimitives() {
   const finalMs = Math.round(performance.now() - totalStart)
   updatePanel('完成 ' + finalMs + 'ms')
 
-  // 使用 preRender 事件更新动画
+  // 使用 preRender 事件更新动画，限帧 20fps 避免主线程阻塞
   viewer.scene.preRender.addEventListener(() => {
-    if (isAnimating && models.length > 0) {
-      const now = performance.now()
-      const deltaTime = (now - lastFrameTime) / 1000
-      lastFrameTime = now
-      animationTime += deltaTime
+    if (!isAnimating || models.length === 0) return
+    const now = performance.now()
+    if (now - lastUpdateMs < UPDATE_INTERVAL) return
+    const deltaTime = (now - lastFrameTime) / 1000
+    lastFrameTime = now
+    lastUpdateMs = now
+    animationTime += deltaTime
 
-      for (let i = 0; i < models.length; i++) {
-        const row = Math.floor(i / columns)
-        const col = i % columns
-        const position = calculateDronePosition(i, row, col, animationTime, baseLayouts[i])
+    for (let i = 0; i < models.length; i++) {
+      const row = Math.floor(i / columns)
+      const col = i % columns
+      const pos = calculateDronePosition(i, row, col, animationTime, baseLayouts[i])
 
-        const modelMatrix = Cesium.Transforms.headingPitchRollToFixedFrame(
-          Cesium.Cartesian3.fromDegrees(position.lon, position.lat, position.altitude),
-          new Cesium.HeadingPitchRoll(position.heading, 0, 0)
-        )
-        Cesium.Matrix4.multiplyByUniformScale(modelMatrix, modelScale, modelMatrix)
-        models[i].modelMatrix = modelMatrix
-      }
-
-      viewer.scene.requestRender()
+      Cesium.Cartesian3.fromDegrees(pos.lon, pos.lat, pos.altitude, undefined, _scratchCart3)
+      _scratchHPR.heading = pos.heading
+      _scratchHPR.pitch = 0
+      _scratchHPR.roll = 0
+      const modelMatrix = Cesium.Transforms.headingPitchRollToFixedFrame(_scratchCart3, _scratchHPR)
+      Cesium.Matrix4.multiplyByUniformScale(modelMatrix, modelScale, modelMatrix)
+      models[i].modelMatrix = modelMatrix
     }
+
+    viewer.scene.requestRender()
   })
 
   viewer.scene.requestRender()
