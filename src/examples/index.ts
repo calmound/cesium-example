@@ -50,6 +50,7 @@ import { meta as primitiveVector } from './cases/vector/primitive-vector'
 
 // Terrain - 地形分析
 import { meta as terrainBasic } from './cases/terrain/terrain-basic'
+import { meta as taiwanLocalTerrain } from './cases/terrain/taiwan-local-terrain'
 import { meta as terrainExcavation } from './cases/terrain/terrain-excavation'
 import { meta as terrainFlattening } from './cases/terrain/terrain-flattening'
 import { meta as contourLine } from './cases/terrain/contour-line'
@@ -155,6 +156,7 @@ const registry: ExampleMeta[] = [
   primitiveVector,
   // 地形分析
   terrainBasic,
+  taiwanLocalTerrain,
   terrainExcavation,
   terrainFlattening,
   contourLine,
